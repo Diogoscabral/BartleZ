@@ -806,6 +806,23 @@ body {
     let shootingMode, shootDirection, throttle = true; // tentativas de evitar falta de limite de frames em js
     let playerID;
     let followersShouldNotShoot = false;
+    let shootingInterval;
+
+    document.addEventListener("mousedown", (event) => {
+        if(!shootingInterval) {
+            shootingInterval = setInterval(() => {
+                player.shoot(gameMap.getCurrentRoom());
+            }, 200);
+        }
+    });
+
+    document.addEventListener("mouseup", (event) => {
+        if (shootingInterval) {
+            clearInterval(shootingInterval);
+            shootingInterval = null;
+        }
+    });
+
 
 
         //classes adicionadas dijo
@@ -862,7 +879,7 @@ body {
         this.answeredQuestions = new Set(); // Adiciona um conjunto para armazenar perguntas respondidas
         this.dx = 0;
         this.dy = 0;
-        this.speed = 7; //5
+        this.speed = 5; //5
         this.health = 100;
         this.healthBar = null;
         this.reloadSpeed = 2;
@@ -1036,21 +1053,57 @@ body {
                 player.element.style.left = left + 'px';
             }
         }
+
+        document.addEventListener("mousemove", (event)=>{
+            const personagem = document.getElementById("personagem");
+            
+            const personagemX = personagem.offsetleft + personagem.offsetWidth / 2;
+            const personagemY = personagem.offsetTop + personagem.offsetHeight / 2;
+
+            const deltaX = event.clientX - personagemX;
+            const deltaY = event.clientY - personagemY;
+
+            const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+
+            personagem.style.transform = `rotate(${angle}deg)`;
+        });
     }
 
-    shoot(rotation, room) {
-        this.startShotTimer(this.reloadTimer, this.reloadSpeed); // Start the shot timer
+    shoot(room) {
+        if (!this.canShoot()) return; // Se estiver em recarga, não dispara
 
-        if (!this.canShoot()) return;
+        this.startShotTimer(); // Inicia a recarga
 
-        const playerPositionX = parseInt(getComputedStyle(personagem).left);
-        const playerPositionY = parseInt(getComputedStyle(personagem).top);
-    
-        const bullet = createBullet(playerPositionX, playerPositionY);
-    
-        bullet.dx = Math.cos(rotation);
-        bullet.dy = Math.sin(rotation);
-    
+        const playerElement = document.getElementById("personagem");
+        const bullet = createBullet(playerElement.offsetLeft, playerElement.offsetTop);
+
+        // Posição correta do jogador
+        const playerRect = playerElement.getBoundingClientRect();
+        const mapaRect = document.getElementById("mapa").getBoundingClientRect();
+        const playerX = playerRect.left + playerRect.width / 2 - mapaRect.left;
+        const playerY = playerRect.top + playerRect.height / 2 - mapaRect.top;
+
+        // Posição do rato
+        const mouseX = event.clientX - mapaRect.left;
+        const mouseY = event.clientY - mapaRect.top;
+
+        // Direção do tiro
+        const deltaX = mouseX - playerX;
+        const deltaY = mouseY - playerY;
+        const magnitude = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        const dirX = deltaX / magnitude;
+        const dirY = deltaY / magnitude;
+
+        // Ajustar posição inicial da bala para sair da frente do personagem
+        const bulletSpawnOffset = 50;
+        bullet.x = playerX + dirX * bulletSpawnOffset;
+        bullet.y = playerY + dirY * bulletSpawnOffset;
+        bullet.dx = dirX;
+        bullet.dy = dirY;
+
+        bullet.element.style.left = `${bullet.x}px`;
+        bullet.element.style.top = `${bullet.y}px`;
+
         updateBullet(bullet, room, this.weaponDamage);
     }
 
@@ -1319,7 +1372,7 @@ class Bullet {
         this.dx = dx;
         this.dy = dy;
         this.element = null;
-        this.speed = 9; // velocidade bala=6
+        this.speed = 6; // velocidade bala=6
     }
 }
 
@@ -4007,6 +4060,8 @@ function updateScore(newScore) {
                             y: event.pageY
                         });
                     }
+                    clearInterval(shootingInterval);
+                    shootingInterval = null;
                 });
             }
 
